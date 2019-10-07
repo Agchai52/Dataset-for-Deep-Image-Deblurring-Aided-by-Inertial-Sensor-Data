@@ -221,15 +221,16 @@ class SynImages(object):
         gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
         acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
 
+        #cv2.imshow('Reference', img/255.0)
+        #cv2.imshow('Blurry', blur_img/255.0)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
+
         if isPlot:
             self.plot_image_IMU(img, blur_img)
         return blur_img, time_stamp, gyro, acc
 
     def plot_image_IMU(self, img, blur_img):
-        #cv2.imshow('Reference', img/255.0)
-        #cv2.imshow('Blurry', blur_img/255.0)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
 
         plt.figure()
         plt.plot(self.old_time_stamp, 100000*self.raw_gyro_x, 'or', label='raw_gyro_x')
