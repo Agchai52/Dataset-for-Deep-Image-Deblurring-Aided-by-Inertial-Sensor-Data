@@ -1,6 +1,7 @@
 # Dataset for Deep Image Deblurring Aided by Inertial Sensor Data
 
 ## Required Libraries
+- Python==2.7
 - matplotlib==2.2.2
 - numpy==1.14.3
 - opencv-python==3.4.0.12
