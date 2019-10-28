@@ -27,11 +27,11 @@ class SynImages(object):
         self.exposure_low = 0.01
         self.exposure_high = 0.1
 
-        self.angular_v_low = -0.1
-        self.angular_v_high = 0.1
+        self.angular_v_mean = 0.
+        self.angular_v_std = 0.05
 
-        self.acceleration_low = -2e-4
-        self.acceleration_high = 2e-4
+        self.acceleration_mean = 0.
+        self.acceleration_std = 1e-4
 
         self.focal_length = 50.
         self.pixel_size = 2.44 * 10 ** -6
@@ -41,21 +41,24 @@ class SynImages(object):
                                      [0, self.focal_length/self.pixel_size, self.image_W/2],
                                      [0, 0, 1]])
 
-    # Synthetic Inertial Sensor Data Generation
     def generate_syn_IMU(self):
+        """
+         # Synthetic Inertial Sensor Data Generation
+        :return:
+        """
 
         # Generate Raw IMU data
         self.exposure = np.random.uniform(low=self.exposure_low, high=self.exposure_high)
         self.interval = self.exposure / self.pose
         self.samples = int(np.floor(self.exposure * self.sample_freq))
 
-        self.gyro_x = 1e-5*np.random.uniform(low=self.angular_v_low, high=self.angular_v_high, size=(self.samples, ))
-        self.gyro_y = 1e-5*np.random.uniform(low=self.angular_v_low, high=self.angular_v_high, size=(self.samples, ))
-        self.gyro_z = np.random.uniform(low=self.angular_v_low, high=self.angular_v_high, size=(self.samples, ))
+        self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_z = np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
 
-        self.acc_x = np.random.uniform(low=self.acceleration_low, high=self.acceleration_high, size=(self.samples, ))
-        self.acc_y = np.random.uniform(low=self.acceleration_low, high=self.acceleration_high, size=(self.samples, ))
-        self.acc_z = np.random.uniform(low=self.acceleration_low, high=self.acceleration_high, size=(self.samples, ))
+        self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_z = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
 
         self.raw_gyro_x = np.insert(self.gyro_x, 0, 0.0)
         self.raw_gyro_y = np.insert(self.gyro_y, 0, 0.0)
@@ -178,6 +181,7 @@ class SynImages(object):
 
     def syn_homography(self):
         """
+        # Generate N = self.pose Synthetic Homography
         :return: syn_H: List[3x3 Ndarray]
 
 
@@ -205,6 +209,12 @@ class SynImages(object):
         return syn_H
 
     def create_syn_images(self, img, isPlot=False):
+        """
+        # Generate a Synthetic Blurry Image
+        :param img:  (H,W,3) ndarray size match with (self.image_H, self.image_W)
+        :param isPlot: Bool True: Plot Sensor Data
+        :return:  blurry image, sensor time, gyo, acc
+        """
         syn_H = self.syn_homography()
         frames = []
 
@@ -220,11 +230,6 @@ class SynImages(object):
         time_stamp = self.time_stamp
         gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
         acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
-
-        #cv2.imshow('Reference', img/255.0)
-        #cv2.imshow('Blurry', blur_img/255.0)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
 
         if isPlot:
             self.plot_image_IMU(img, blur_img)
@@ -263,3 +268,7 @@ class SynImages(object):
         plt.savefig("Output/plot_XYZ_ACC.jpg")
         plt.show()
 
+        cv2.imshow('Reference', img / 255.0)
+        cv2.imshow('Blurry', blur_img / 255.0)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
