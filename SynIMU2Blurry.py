@@ -41,6 +41,18 @@ class SynImages(object):
                                      [0, self.focal_length/self.pixel_size, self.image_W/2],
                                      [0, 0, 1]])
 
+        # For error data
+        self.time_delay_mean = 0.03
+        self.time_delay_std = 0.01
+        self.total_samples = 220
+
+        self.angular_v_noise_mean = 0.
+        self.angular_v_noise_std = 0.1 * self.angular_v_std
+
+        self.acceleration_noise_mean = 0.
+        self.acceleration_noise_std = 0.1 * self.acceleration_std
+
+
     def generate_syn_IMU(self):
         """
          # Synthetic Inertial Sensor Data Generation
@@ -227,13 +239,90 @@ class SynImages(object):
 
         frames = np.array(frames)
         blur_img = np.mean(frames, axis=0)
-        time_stamp = self.time_stamp
         gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
         acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
 
+        self.add_error2data(img, syn_H, gyro, acc)
+        #error_blur_img, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
+
+        # plot result and then print data to txt file
+
         if isPlot:
             self.plot_image_IMU(img, blur_img)
-        return blur_img, time_stamp, gyro, acc
+        return blur_img
+
+    def add_error2data(self, img, syn_H, gyro, acc):
+        # Add time delay
+        shift_gyro, shift_acc, shift_time_stamp = self.add_time_delay(gyro, acc)
+
+        # Add noise to inertial sensor data
+        error_gyro, error_acc = self.add_noise2IMU(shift_gyro, shift_acc)
+        print(error_gyro)
+        print(error_acc)
+        #
+        ## Change rotation center
+        #shift_blurry = self.add_rotation_center(img, syn_H)
+        #
+        ## Add rolling shutter effect
+        #shift_blurry = self.add_rolling_shutter(shift_blurry)
+        #
+        ## Add noise to blurry image
+        #error_blur_img = self.add_noise2Blurry(shift_blurry)
+        #
+        #return error_blur_img, shift_timestamp, error_gyro, error_acc
+
+    def add_time_delay(self, gyro, acc):
+        time_delay = np.clip(np.random.normal(loc=self.time_delay_mean, scale=self.time_delay_std),
+                             a_min=0., a_max=0.069)
+        delay_index = int(np.floor(time_delay/self.interval))
+
+        # Time
+        shift_time_stamp = np.zeros(shape=self.total_samples, dtype=float)
+        shift_time_stamp[delay_index:delay_index+self.pose+1] = self.time_stamp
+
+        # Gyro
+        shift_gyro = np.zeros(shape=(3, self.total_samples), dtype=float)
+        shift_gyro[0][delay_index:delay_index+self.pose+1] = gyro[0]
+        shift_gyro[1][delay_index:delay_index+self.pose+1] = gyro[1]
+        shift_gyro[2][delay_index:delay_index+self.pose+1] = gyro[2]
+
+        # Acc
+        shift_acc = np.zeros(shape=(3, self.total_samples), dtype=float)
+        shift_acc[0][delay_index:delay_index+self.pose+1] = acc[0]
+        shift_acc[1][delay_index:delay_index+self.pose+1] = acc[1]
+        shift_acc[2][delay_index:delay_index+self.pose+1] = acc[2]
+
+        return shift_gyro, shift_acc, shift_time_stamp
+
+
+    def add_noise2IMU(self, gyro, acc):
+        # Gyro
+        error_gyro = gyro
+        add_error_gyro_0 = 1e-5*np.random.normal(loc=self.angular_v_noise_mean, scale=self.angular_v_noise_std,
+                                                 size=(self.total_samples, ))
+        add_error_gyro_1 = 1e-5*np.random.normal(loc=self.angular_v_noise_mean, scale=self.angular_v_noise_std,
+                                                 size=(self.total_samples, ))
+        add_error_gyro_2 = np.random.normal(loc=self.angular_v_noise_mean, scale=self.angular_v_noise_std,
+                                            size=(self.total_samples, ))
+        error_gyro[0] += add_error_gyro_0
+        error_gyro[1] += add_error_gyro_1
+        error_gyro[2] += add_error_gyro_2
+
+        # Acc
+        error_acc = acc
+        add_error_acc_0 = np.random.normal(loc=self.acceleration_noise_mean, scale=self.acceleration_noise_std,
+                                           size=(self.total_samples, ))
+        add_error_acc_1 = np.random.normal(loc=self.acceleration_noise_mean, scale=self.acceleration_noise_std,
+                                           size=(self.total_samples, ))
+        add_error_acc_2 = np.random.normal(loc=self.acceleration_noise_mean, scale=self.acceleration_noise_std,
+                                           size=(self.total_samples, ))
+        error_acc[0] += add_error_acc_0
+        error_acc[1] += add_error_acc_1
+        error_acc[2] += add_error_acc_2
+
+        return error_gyro, error_acc
+
+
 
     def plot_image_IMU(self, img, blur_img):
 
