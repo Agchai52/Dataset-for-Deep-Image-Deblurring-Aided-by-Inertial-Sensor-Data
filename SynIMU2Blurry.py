@@ -283,7 +283,7 @@ class SynImages(object):
         # Add noise to blurry image
         error_blur_img = self.add_noise2Blurry(shift_blurry)
 
-        return error_blur_img, shift_timestamp, error_gyro, error_acc
+        return error_blur_img, shift_time_stamp, error_gyro, error_acc
 
 
     def add_time_delay(self, gyro, acc):
@@ -401,7 +401,7 @@ class SynImages(object):
         :param shift_blurry: (3, H, W)
         :return: error_blur_img with the same size
         """
-        std_r = np.random.uniform(low=0.05, high=0.1)
+        std_r = np.random.uniform(low=0.05, high=0.1) * 255.0
         noise_img = np.random.normal(loc=0, scale=std_r, size=shift_blurry.shape)
         error_blur_img = shift_blurry + noise_img
 
