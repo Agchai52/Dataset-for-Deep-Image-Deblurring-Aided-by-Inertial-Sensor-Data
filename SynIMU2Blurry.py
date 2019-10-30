@@ -35,10 +35,10 @@ class SynImages(object):
 
         self.focal_length = 50.
         self.pixel_size = 2.44 * 10 ** -6
-        self.image_H, self.image_W = 1280, 720
+        self.image_W, self.image_H = 1280, 720
 
-        self.intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_H/2],
-                                     [0, self.focal_length/self.pixel_size, self.image_W/2],
+        self.intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_W/2],
+                                     [0, self.focal_length/self.pixel_size, self.image_H/2],
                                      [0, 0, 1]])
 
         # For error data
@@ -52,6 +52,21 @@ class SynImages(object):
         self.acceleration_noise_mean = 0.
         self.acceleration_noise_std = 0.1 * self.acceleration_std
 
+        #
+        self.paramDict = dict()
+        self.paramDict["Sampling frequence"] = self.sample_freq
+        self.paramDict["Number of poses"] = self.pose
+        self.paramDict["Total samples of noisy IMU data"] = self.total_samples
+        self.paramDict["Focal length"] = self.focal_length
+        self.paramDict["Pixel size"] = self.pixel_size
+        self.paramDict["Image Width"] = self.image_W
+        self.paramDict["Image Height"] = self.image_H
+        self.paramDict["Mean of gyro noise"] = self.angular_v_noise_mean
+        self.paramDict["Standard deviation of gyro noise"] = self.angular_v_noise_std
+        self.paramDict["Mean of acc noise"] = self.acceleration_noise_mean
+        self.paramDict["Standard deviation of acc noise"] = self.acceleration_noise_std
+
+
 
     def generate_syn_IMU(self):
         """
@@ -64,13 +79,13 @@ class SynImages(object):
         self.interval = self.exposure / self.pose
         self.samples = int(np.floor(self.exposure * self.sample_freq))
 
-        self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        self.gyro_z = np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_x = 0*1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_y = 0*1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_z = [self.angular_v_mean + 2 * self.angular_v_std] * self.samples #np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
 
-        self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
-        self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
-        self.acc_z = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_x = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_y = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_z = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
 
         self.raw_gyro_x = np.insert(self.gyro_x, 0, 0.0)
         self.raw_gyro_y = np.insert(self.gyro_y, 0, 0.0)
@@ -95,6 +110,7 @@ class SynImages(object):
         self.acc_y = np.array([self.nearest_acc(t, self.raw_acc_y) for t in self.time_stamp])
         self.acc_z = np.array([self.nearest_acc(t, self.raw_acc_z) for t in self.time_stamp])
 
+        self.paramDict["Exposure time"] = self.exposure
         #print('exposure =', self.exposure)
         #print('old_timestamp =', self.old_time_stamp)
         #print('timestamp =', self.time_stamp)
@@ -106,6 +122,7 @@ class SynImages(object):
         #print('acc_x =', self.acc_x)
         #print('acc_y =', self.acc_y)
         #print('acc_z =', self.acc_z)
+
 
     def nearest_acc(self, t, acc):
         """
@@ -194,7 +211,7 @@ class SynImages(object):
     def syn_homography(self):
         """
         # Generate N = self.pose Synthetic Homography
-        :return: syn_H: List[3x3 Ndarray]
+        :return: syn_H: Array[self.pose][3x3] perfect synthetic homography
 
 
         H_i = K * (R + T * normal_vector ^ T) * inv(K)
@@ -233,7 +250,7 @@ class SynImages(object):
         im_src = img
         for i in range(self.pose):
             h_mat = syn_H[i]
-            im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_H, self.image_W))
+            im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_W, self.image_H))
             frames.append(im_dst)
             im_src = im_dst
 
@@ -242,43 +259,54 @@ class SynImages(object):
         gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
         acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
 
-        self.add_error2data(img, syn_H, gyro, acc)
-        #error_blur_img, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
+        error_blur_img, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
 
-        # plot result and then print data to txt file
+        # plot result and then print data to a .txt file
 
         if isPlot:
-            self.plot_image_IMU(img, blur_img)
+            self.plot_image_IMU(img, error_blur_img)
         return blur_img
 
-    def add_error2data(self, img, syn_H, gyro, acc):
+    def add_error2data(self, img,  syn_H, gyro, acc):
         # Add time delay
         shift_gyro, shift_acc, shift_time_stamp = self.add_time_delay(gyro, acc)
 
         # Add noise to inertial sensor data
         error_gyro, error_acc = self.add_noise2IMU(shift_gyro, shift_acc)
-        print(error_gyro)
-        print(error_acc)
-        #
-        ## Change rotation center
-        #shift_blurry = self.add_rotation_center(img, syn_H)
-        #
-        ## Add rolling shutter effect
-        #shift_blurry = self.add_rolling_shutter(shift_blurry)
-        #
-        ## Add noise to blurry image
-        #error_blur_img = self.add_noise2Blurry(shift_blurry)
-        #
-        #return error_blur_img, shift_timestamp, error_gyro, error_acc
+
+        # Change rotation center
+        shift_blurry = self.add_rotation_center(img, syn_H)
+
+        # # Add rolling shutter effect
+        # shift_blurry = self.add_rolling_shutter(shift_blurry)
+
+        # Add noise to blurry image
+        error_blur_img = self.add_noise2Blurry(shift_blurry)
+
+        return error_blur_img, shift_timestamp, error_gyro, error_acc
+
 
     def add_time_delay(self, gyro, acc):
+        """
+        Add time delay to self.time_stamp, gyro and acc
+
+        Total samples = self.total_samples (default 220)
+
+        Original samples = self.pose + 1
+
+
+        :param gyro: Array[3][self.pose+1] perfect synthetic gyro
+        :param acc: Array[3][self.pose+1] perfect synthetic acc
+        :return:  shifted data from start time to delayed time
+        """
         time_delay = np.clip(np.random.normal(loc=self.time_delay_mean, scale=self.time_delay_std),
                              a_min=0., a_max=0.069)
         delay_index = int(np.floor(time_delay/self.interval))
 
         # Time
         shift_time_stamp = np.zeros(shape=self.total_samples, dtype=float)
-        shift_time_stamp[delay_index:delay_index+self.pose+1] = self.time_stamp
+        for i in range(self.total_samples):
+            shift_time_stamp[i] = self.interval * i
 
         # Gyro
         shift_gyro = np.zeros(shape=(3, self.total_samples), dtype=float)
@@ -292,10 +320,17 @@ class SynImages(object):
         shift_acc[1][delay_index:delay_index+self.pose+1] = acc[1]
         shift_acc[2][delay_index:delay_index+self.pose+1] = acc[2]
 
+        self.paramDict["Time delay"] = time_delay
         return shift_gyro, shift_acc, shift_time_stamp
 
 
     def add_noise2IMU(self, gyro, acc):
+        """
+        Add noise to perfect gyro and acc
+        :param gyro: Array[3][self.pose+1] perfect synthetic gyro
+        :param acc: Array[3][self.pose+1] perfect synthetic acc
+        :return: error_gyro and error_acc with the same size
+        """
         # Gyro
         error_gyro = gyro
         add_error_gyro_0 = 1e-5*np.random.normal(loc=self.angular_v_noise_mean, scale=self.angular_v_noise_std,
@@ -322,6 +357,56 @@ class SynImages(object):
 
         return error_gyro, error_acc
 
+    def add_rotation_center(self, img, syn_H):
+        """
+        Shift rotation center of the blurry image (average frames of poses)
+
+        H_ = K_ * (inv(K) * H * K) * inv(K_)
+
+        K : original intrinsic mat
+        K_: new intrinsic mat, shifted rotation center
+        :param syn_H: Array[self.pose][3x3] perfect synthetic homography
+        :return: new blury image with shifted rotation center
+        """
+        rotation_o_x = np.random.normal(loc=0, scale=self.image_W/4)
+        rotation_o_y = np.random.normal(loc=0, scale=self.image_W / 4)
+
+        new_intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_W/2 + rotation_o_x],
+                                     [0, self.focal_length/self.pixel_size, self.image_H/2 + rotation_o_y],
+                                     [0, 0, 1]])
+
+        frames = []
+        im_src = img
+        K  = self.intrinsicMat
+        K_ = new_intrinsicMat
+        for i in range(self.pose):
+            h_mat_ = syn_H[i]
+            h_temp = np.matmul(np.matmul(np.linalg.inv(K), h_mat_), K)
+            h_mat = np.matmul(np.matmul(K_, h_temp), np.linalg.inv(K_))
+            h_mat = h_mat / h_mat[2][2]
+            im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_W, self.image_H))
+            frames.append(im_dst)
+            im_src = im_dst
+
+        frames = np.array(frames)
+        shift_blurry = np.mean(frames, axis=0)
+
+        self.paramDict["Rotation center o_x"] = rotation_o_x
+        self.paramDict["Rotation center o_y"] = rotation_o_y
+        return shift_blurry
+
+    def add_noise2Blurry(self, shift_blurry):
+        """
+        Add noise to a blurry image
+        :param shift_blurry: (3, H, W)
+        :return: error_blur_img with the same size
+        """
+        std_r = np.random.uniform(low=0.05, high=0.1)
+        noise_img = np.random.normal(loc=0, scale=std_r, size=shift_blurry.shape)
+        error_blur_img = shift_blurry + noise_img
+
+        self.paramDict["Standard deviation of noise added to the blurry image"] = std_r
+        return error_blur_img
 
 
     def plot_image_IMU(self, img, blur_img):
