@@ -148,6 +148,7 @@ class SynImages(object):
         omega_xi = self.gyro_x[i]
         i = 0, 1, 2, ..., pose
         """
+
         rotations = []
         dt = self.interval
         R = np.array([[1, 0, 0],[0, 1, 0],[0, 0, 1]])
