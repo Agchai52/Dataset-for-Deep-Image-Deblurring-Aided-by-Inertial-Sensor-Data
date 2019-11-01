@@ -401,7 +401,7 @@ class SynImages(object):
         :param shift_blurry: (3, H, W)
         :return: error_blur_img with the same size
         """
-        std_r = np.random.uniform(low=0.05, high=0.1) * 255.0
+        std_r = np.random.uniform(low=0.05, high=0.1) * 255.0 / np.sqrt(self.pose)
         noise_img = np.random.normal(loc=0, scale=std_r, size=shift_blurry.shape)
         error_blur_img = shift_blurry + noise_img
 
