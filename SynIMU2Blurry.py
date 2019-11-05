@@ -52,7 +52,11 @@ class SynImages(object):
         self.acceleration_noise_mean = 0.
         self.acceleration_noise_std = 0.1 * self.acceleration_std
 
-        #
+        self.readout_mean = 15e-3
+        self.readout_std = 6e-3
+        self.total_sub = 10  # self.image_H
+
+        # Parameter Dict for Error Effect
         self.paramDict = dict()
         self.paramDict["Sampling frequence"] = self.sample_freq
         self.paramDict["Number of poses"] = self.pose
@@ -221,8 +225,8 @@ class SynImages(object):
 
         """
         self.generate_syn_IMU()
-        rotations = self.compute_rotations()
-        translations = self.compute_translations(rotations)
+        self.rotations = self.compute_rotations()
+        self.translations = self.compute_translations(rotations)
 
         # Ri3_0 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 0]])  # set all rows of column 3 to 0
         norm_v = np.array([0, 0, 1]).reshape(1, 3)  # norm vector of current plane
@@ -230,8 +234,8 @@ class SynImages(object):
         K = self.intrinsicMat
         syn_H = []
         for i in range(1, self.pose+1):
-            R = rotations[i]  # np.matmul(rotations[i], Ri3_0)
-            T = np.matmul(translations[i], norm_v)
+            R = self.rotations[i]  # np.matmul(rotations[i], Ri3_0)
+            T = np.matmul(self.translations[i], norm_v)
             H = np.matmul(np.matmul(K, R+T), np.linalg.inv(K))
             H = H / H[2][2]
             syn_H.append(H)
@@ -372,14 +376,14 @@ class SynImages(object):
         rotation_o_x = np.random.normal(loc=0, scale=self.image_W/4)
         rotation_o_y = np.random.normal(loc=0, scale=self.image_W / 4)
 
-        new_intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_W/2 + rotation_o_x],
+        self.new_intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_W/2 + rotation_o_x],
                                      [0, self.focal_length/self.pixel_size, self.image_H/2 + rotation_o_y],
                                      [0, 0, 1]])
 
         frames = []
         im_src = img
         K  = self.intrinsicMat
-        K_ = new_intrinsicMat
+        K_ = self.new_intrinsicMat
         for i in range(self.pose):
             h_mat_ = syn_H[i]
             h_temp = np.matmul(np.matmul(np.linalg.inv(K), h_mat_), K)
@@ -395,6 +399,40 @@ class SynImages(object):
         self.paramDict["Rotation center o_x"] = rotation_o_x
         self.paramDict["Rotation center o_y"] = rotation_o_y
         return shift_blurry
+
+    def nearest_rot(self, t, rot):
+        """
+        :param t: current timestamp: Float
+        :param acc: acc of a specific axis: Array([float])
+        :return: nearest acc: Float
+        """
+        i_nearest = np.abs(t-self.time_stamp).argmin()
+        return rot[i_nearest]
+
+    def add_rolling_shutter(self, img_blur):
+        t_readout = np.random.normal(loc=self.readout_mean, scale=self.readout_std)
+        piece_H = int(self.image_H/self.total_sub)
+        R_last = self.rotations[-1]
+        K_ = self.new_intrinsicMat
+
+        new_pieces = []
+        y = piece_H - 1  # y is the row index
+        while y < self.image_H:
+            # time and approximated rotation for y th row
+            t_y = t_readout * y / self.image_H
+            R_y = self.nearest_rot(t_y, self.rotations)
+            R_new = np.matmul(R_last, np.transpose(R_y))
+            W_y = np.matmul(np.matmul(K_, R_new), np.linalg.inv(K_))
+            old_piece = im_blur[y-piece_H:y+1, :, :]
+            new_piece = cv2.warpPerspective(old_piece, W_y, (self.image_W, piece_H))
+            new_pieces.append(new_piece)
+            y += piece_H
+
+        img_blur_rs = np.concatenate(np.array(new_pieces), axis=0)
+        self.paramDict["Readout time"] = t_readout
+        return img_blur_rs
+
+
 
     def add_noise2Blurry(self, shift_blurry):
         """
