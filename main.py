@@ -4,7 +4,7 @@ from SynIMU2Blurry import *
 
 
 img = cv2.imread("InputImages/001464.png", 1).astype(np.float)
-
+#img = cv2.imread("InputImages/checkerboard2.png", 1).astype(np.float)
 SynData = SynImages()
 blur_img = SynData.create_syn_images(img, isPlot=True)
 cv2.imwrite("Output/blurry_001464.png", blur_img)

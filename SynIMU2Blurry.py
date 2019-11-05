@@ -27,7 +27,7 @@ class SynImages(object):
         self.exposure_low = 0.01
         self.exposure_high = 0.1
 
-        self.angular_v_mean = 0.
+        self.angular_v_mean = 0  # 5 if it's for rolling shutter test
         self.angular_v_std = 0.05
 
         self.acceleration_mean = 0.
@@ -54,7 +54,7 @@ class SynImages(object):
 
         self.readout_mean = 15e-3
         self.readout_std = 6e-3
-        self.total_sub = 10  # self.image_H
+        self.total_sub = self.image_H
 
         # Parameter Dict for Error Effect
         self.paramDict = dict()
@@ -83,13 +83,13 @@ class SynImages(object):
         self.interval = self.exposure / self.pose
         self.samples = int(np.floor(self.exposure * self.sample_freq))
 
-        self.gyro_x = 0*1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        self.gyro_y = 0*1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_z = [self.angular_v_mean + 2 * self.angular_v_std] * self.samples #np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
 
-        self.acc_x = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
-        self.acc_y = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
-        self.acc_z = 0*np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
+        self.acc_z = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
 
         self.raw_gyro_x = np.insert(self.gyro_x, 0, 0.0)
         self.raw_gyro_y = np.insert(self.gyro_y, 0, 0.0)
@@ -226,7 +226,8 @@ class SynImages(object):
         """
         self.generate_syn_IMU()
         self.rotations = self.compute_rotations()
-        self.translations = self.compute_translations(rotations)
+        self.translations = self.compute_translations(self.rotations)
+        self.rotations_array = np.array(self.rotations).reshape(self.pose+1, 9)
 
         # Ri3_0 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 0]])  # set all rows of column 3 to 0
         norm_v = np.array([0, 0, 1]).reshape(1, 3)  # norm vector of current plane
@@ -264,15 +265,23 @@ class SynImages(object):
         gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
         acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
 
-        error_blur_img, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
+        error_blur_img, shift_blurry, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
 
         # plot result and then print data to a .txt file
 
         if isPlot:
-            self.plot_image_IMU(img, error_blur_img)
+            self.plot_image_IMU(img, blur_img, shift_blurry, error_blur_img)
         return blur_img
 
     def add_error2data(self, img,  syn_H, gyro, acc):
+        """
+        Add errors to perfect synthetic data
+        :param img:
+        :param syn_H:
+        :param gyro:
+        :param acc:
+        :return:
+        """
         # Add time delay
         shift_gyro, shift_acc, shift_time_stamp = self.add_time_delay(gyro, acc)
 
@@ -283,13 +292,12 @@ class SynImages(object):
         shift_blurry = self.add_rotation_center(img, syn_H)
 
         # # Add rolling shutter effect
-        # shift_blurry = self.add_rolling_shutter(shift_blurry)
+        #rolling_blurry = self.add_rolling_shutter(shift_blurry)
 
         # Add noise to blurry image
         error_blur_img = self.add_noise2Blurry(shift_blurry)
 
-        return error_blur_img, shift_time_stamp, error_gyro, error_acc
-
+        return error_blur_img, shift_blurry, shift_time_stamp, error_gyro, error_acc
 
     def add_time_delay(self, gyro, acc):
         """
@@ -325,6 +333,9 @@ class SynImages(object):
         shift_acc[1][delay_index:delay_index+self.pose+1] = acc[1]
         shift_acc[2][delay_index:delay_index+self.pose+1] = acc[2]
 
+        self.delay_gyro = np.array(shift_gyro).reshape((3, self.total_samples))
+        self.delay_acc = np.array(shift_acc).reshape((3, self.total_samples))
+        self.delay_time_stamp = shift_time_stamp
         self.paramDict["Time delay"] = time_delay
         return shift_gyro, shift_acc, shift_time_stamp
 
@@ -359,6 +370,9 @@ class SynImages(object):
         error_acc[0] += add_error_acc_0
         error_acc[1] += add_error_acc_1
         error_acc[2] += add_error_acc_2
+
+        self.error_gyro = np.array(error_gyro).reshape((3, self.total_samples))
+        self.error_acc = np.array(error_acc).reshape((3, self.total_samples))
 
         return error_gyro, error_acc
 
@@ -395,40 +409,62 @@ class SynImages(object):
 
         frames = np.array(frames)
         shift_blurry = np.mean(frames, axis=0)
+        print("rotation center = ", (rotation_o_x, rotation_o_y))
 
         self.paramDict["Rotation center o_x"] = rotation_o_x
         self.paramDict["Rotation center o_y"] = rotation_o_y
         return shift_blurry
 
-    def nearest_rot(self, t, rot):
+    def interp_rot(self, t):
         """
         :param t: current timestamp: Float
         :param acc: acc of a specific axis: Array([float])
         :return: nearest acc: Float
         """
-        i_nearest = np.abs(t-self.time_stamp).argmin()
-        return rot[i_nearest]
+        if t >= self.time_stamp[-1]:
+            return self.rotations[-1]
+
+        rot_t = np.array([0.]*9)
+        for i in range(9):
+            rot_t[i] = np.interp(t, self.time_stamp, self.rotations_array[:, i])
+
+        return rot_t.reshape((3, 3))
+
 
     def add_rolling_shutter(self, img_blur):
+        """
+        Add rolling shutter effect to blurry image
+        :param img_blur:
+        :return: img_blur_rs
+
+        t_y = t_readout * y / img_H
+        R_new = R_last * R(t_y)
+        W_new = K_ * R_new * inv(K_)
+        img_blur_i = img_blur[y:y+piece_H+1]
+        new_piece_i= Wrap(W_new, img_blur_i)
+        """
         t_readout = np.random.normal(loc=self.readout_mean, scale=self.readout_std)
         piece_H = int(self.image_H/self.total_sub)
         R_last = self.rotations[-1]
         K_ = self.new_intrinsicMat
 
+
         new_pieces = []
-        y = piece_H - 1  # y is the row index
-        while y < self.image_H:
+        y = piece_H  # y-1 is the row index
+
+        while y <= self.image_H:
             # time and approximated rotation for y th row
             t_y = t_readout * y / self.image_H
-            R_y = self.nearest_rot(t_y, self.rotations)
-            R_new = np.matmul(R_last, np.transpose(R_y))
+            R_y = self.interp_rot(t_y)
+            R_new = np.matmul(R_last, np.linalg.inv(R_y))
             W_y = np.matmul(np.matmul(K_, R_new), np.linalg.inv(K_))
-            old_piece = im_blur[y-piece_H:y+1, :, :]
-            new_piece = cv2.warpPerspective(old_piece, W_y, (self.image_W, piece_H))
+            old_piece = img_blur[y-piece_H:y, :, :]
+            new_piece = cv2.warpPerspective(old_piece, W_y, (self.image_W, piece_H), flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS, borderMode=cv2.BORDER_REPLICATE)
             new_pieces.append(new_piece)
             y += piece_H
 
         img_blur_rs = np.concatenate(np.array(new_pieces), axis=0)
+
         self.paramDict["Readout time"] = t_readout
         return img_blur_rs
 
@@ -445,43 +481,67 @@ class SynImages(object):
         error_blur_img = shift_blurry + noise_img
 
         self.paramDict["Standard deviation of noise added to the blurry image"] = std_r
+        print("std of img_noise", std_r)
         return error_blur_img
 
 
-    def plot_image_IMU(self, img, blur_img):
+    def plot_image_IMU(self, img, blur_img, shift_blur, error_blur):
 
         plt.figure()
-        plt.plot(self.old_time_stamp, 100000*self.raw_gyro_x, 'or', label='raw_gyro_x')
-        plt.plot(self.time_stamp, 100000*self.gyro_x, '-r', label='gyro_x')
-        plt.plot(self.old_time_stamp, 100000*self.raw_gyro_y, 'og', label='raw_gyro_y')
-        plt.plot(self.time_stamp, 100000*self.gyro_y, '-g', label='gyro_y')
+        ax1 = plt.subplot(311)
+        ax1.plot(self.old_time_stamp, 100000*self.raw_gyro_x, 'or', markersize=2, label='raw_gyro_x')
+        ax1.plot(self.time_stamp, 100000*self.gyro_x, '--r', label='gyro_x')
+        ax1.plot(self.delay_time_stamp, 100000 * self.delay_gyro[0], '-r', label='delay_gyro_x')
+        ax1.plot(self.delay_time_stamp, 100000 * self.error_gyro[0], ':r', label='error_gyro_x')
+        plt.ylabel("w_x * 1e-5 / (rad/s) ")
+        plt.title("XYZ-Axis Gyro Data")
+
+        ax2 = plt.subplot(312)
+        ax2.plot(self.old_time_stamp, 100000*self.raw_gyro_y, 'og', markersize=2, label='raw_gyro_y')
+        ax2.plot(self.time_stamp, 100000*self.gyro_y, '--g', label='gyro_y')
+        ax2.plot(self.delay_time_stamp, 100000 * self.delay_gyro[1], '-g', label='delay_gyro_y')
+        ax2.plot(self.delay_time_stamp, 100000 * self.error_gyro[1], ':g', label='error_gyro_y')
+        plt.ylabel("w_y * 1e-5 / (rad/s) ")
+
+        ax3 = plt.subplot(313)
+        ax3.plot(self.old_time_stamp, self.raw_gyro_z, 'ob', markersize=2, label='raw_gyro_z')
+        ax3.plot(self.time_stamp, self.gyro_z, '--b', label='gyro_z')
+        ax3.plot(self.delay_time_stamp, self.delay_gyro[2], '-b', label='delay_gyro_z')
+        ax3.plot(self.delay_time_stamp,  self.error_gyro[2], ':b', label='error_gyro_z')
+        plt.ylabel("w_z / (rad/s) ")
+
         plt.xlabel("Time / sec")
-        plt.ylabel("Angular Velocity * 1e-5 / (rad/s) ")
-        plt.title("XY-Axis Gyro Data")
-        plt.savefig("Output/plot_XY_Gyro.jpg")
+        plt.savefig("Output/plot_XYZ_Gyro.jpg")
 
         plt.figure()
-        plt.plot(self.old_time_stamp, self.raw_gyro_z, 'ob', label='raw_gyro_z')
-        plt.plot(self.time_stamp, self.gyro_z, '-b', label='gyro_z')
-        plt.xlabel("Time / sec")
-        plt.ylabel("Angular Velocity / (rad/s)")
-        plt.title("Z-Axis Gyro Data")
-        plt.savefig("Output/plot_Z_Gyro.jpg")
-
-        plt.figure()
-        plt.plot(self.old_time_stamp, 1000*self.raw_acc_x, 'or', label='raw_acc_x')
-        plt.plot(self.time_stamp, 1000*self.acc_x, '-r', label='acc_x')
-        plt.plot(self.old_time_stamp, 1000*self.raw_acc_y, 'og', label='raw_acc_y')
-        plt.plot(self.time_stamp, 1000*self.acc_y, '-g', label='acc_y')
-        plt.plot(self.old_time_stamp, 1000*self.raw_acc_z, 'ob', label='raw_acc_z')
-        plt.plot(self.time_stamp, 1000*self.acc_z, '-b', label='acc_z')
-        plt.xlabel("Time / sec")
-        plt.ylabel("Acceleration * 1e-3 / (m^2/s) ")
+        ax1 = plt.subplot(311)
+        ax1.plot(self.old_time_stamp, 1000*self.raw_acc_x, 'or', markersize=2, label='raw_acc_x')
+        ax1.plot(self.time_stamp, 1000*self.acc_x, '--r', label='acc_x')
+        ax1.plot(self.delay_time_stamp, 1000 * self.delay_acc[0], '-r', label='delay_acc_x')
+        ax1.plot(self.delay_time_stamp, 1000 * self.error_acc[0], ':r', label='error_acc_x')
+        plt.ylabel("a_x * 1e-3 / (m^2/s) ")
         plt.title("XYZ-Axis Acc Data")
+
+        ax2 = plt.subplot(312)
+        ax2.plot(self.old_time_stamp, 1000*self.raw_acc_y, 'og', markersize=2, label='raw_acc_y')
+        ax2.plot(self.time_stamp, 1000*self.acc_y, '--g', label='acc_y')
+        ax2.plot(self.delay_time_stamp, 1000 * self.delay_acc[1], '-g', label='delay_acc_y')
+        ax2.plot(self.delay_time_stamp, 1000 * self.error_acc[1], ':g', label='error_acc_y')
+        plt.ylabel("a_y * 1e-3 / (m^2/s) ")
+
+        ax3 = plt.subplot(313)
+        ax3.plot(self.old_time_stamp, 1000*self.raw_acc_z, 'ob', markersize=2, label='raw_acc_z')
+        ax3.plot(self.time_stamp, 1000*self.acc_z, '--b', label='acc_z')
+        ax3.plot(self.delay_time_stamp, 1000 * self.delay_acc[2], '-b', label='delay_acc_z')
+        ax3.plot(self.delay_time_stamp, 1000 * self.error_acc[2], ':b', label='error_acc_z')
+        plt.ylabel("a_z * 1e-3 / (m^2/s) ")
+        plt.xlabel("Time / sec")
         plt.savefig("Output/plot_XYZ_ACC.jpg")
         plt.show()
 
         cv2.imshow('Reference', img / 255.0)
-        cv2.imshow('Blurry', blur_img / 255.0)
+        cv2.imshow('Blurry_original', blur_img / 255.0)
+        cv2.imshow('Blurry_center_shift', shift_blur / 255.0)
+        cv2.imshow('Blurry_noise', error_blur / 255.0)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
