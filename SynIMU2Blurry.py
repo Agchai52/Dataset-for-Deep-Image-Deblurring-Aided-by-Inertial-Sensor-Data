@@ -231,7 +231,7 @@ class SynImages(object):
 
         return syn_H
 
-    def create_syn_images(self, img, file_prefix, isSave=True, isPlot=False):
+    def create_syn_images(self, img, file_prefix, phase, isSave=True, isPlot=False):
         """
         # Generate a Synthetic Blurry Image
         :param img:  (H,W,3) ndarray size match with (self.image_H, self.image_W)
@@ -256,19 +256,19 @@ class SynImages(object):
         error_blur_img, shift_blurry, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, self.gyro, self.acc)
 
         if isSave:
-            self.save_data(img, blur_img, error_blur_img, file_prefix)
+            self.save_data(img, blur_img, error_blur_img, file_prefix, phase)
 
         if isPlot:
             self.plot_image_IMU(img, blur_img, shift_blurry, error_blur_img)
         return blur_img
 
-    def save_data(self, reference_img, original_blur, error_blur, file_prefix):
-        name_reference = "Dataset/Data_ref/" + file_prefix + ".png"
-        name_IMU_original = "Dataset/Data_ori/" + file_prefix + "_IMU_ori.txt"
-        name_blur_original = "Dataset/Data_ori/" + file_prefix + "_blur_ori.png"
-        name_IMU_error = "Dataset/Data_err/" + file_prefix + "_IMU_err.txt"
-        name_blur_error = "Dataset/Data_err/" + file_prefix + "_blur_err.png"
-        name_param_error = "Dataset/Data_err/" + file_prefix + "_param_err.txt"
+    def save_data(self, reference_img, original_blur, error_blur, file_prefix, phase):
+        name_reference = "Dataset/" + phase + "/Data_ref/" + file_prefix + ".png"
+        name_IMU_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_IMU_ori.txt"
+        name_blur_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_blur_ori.png"
+        name_IMU_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_IMU_err.txt"
+        name_blur_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_blur_err.png"
+        name_param_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_param_err.txt"
 
         # Output reference sharp image
         cv2.imwrite(name_reference, reference_img)
@@ -329,10 +329,10 @@ class SynImages(object):
         shift_blurry = self.add_rotation_center(img, syn_H)
 
         # # Add rolling shutter effect
-        #rolling_blurry = self.add_rolling_shutter(shift_blurry)
+        rolling_blurry = self.add_rolling_shutter(shift_blurry)
 
         # Add noise to blurry image
-        error_blur_img = self.add_noise2Blurry(shift_blurry)
+        error_blur_img = self.add_noise2Blurry(rolling_blurry)
 
         return error_blur_img, shift_blurry, shift_time_stamp, error_gyro, error_acc
 
