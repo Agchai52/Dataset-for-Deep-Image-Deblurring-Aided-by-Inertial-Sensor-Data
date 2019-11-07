@@ -85,7 +85,8 @@ class SynImages(object):
 
         self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        self.gyro_z = [self.angular_v_mean + 2 * self.angular_v_std] * self.samples #np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        self.gyro_z = np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
+        # [self.angular_v_mean + 2 * self.angular_v_std] * self.samples
 
         self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
         self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
@@ -115,18 +116,6 @@ class SynImages(object):
         self.acc_z = np.array([self.nearest_acc(t, self.raw_acc_z) for t in self.time_stamp])
 
         self.paramDict["Exposure time"] = self.exposure
-        #print('exposure =', self.exposure)
-        #print('old_timestamp =', self.old_time_stamp)
-        #print('timestamp =', self.time_stamp)
-        #
-        #print('gyro_x =', self.gyro_x)
-        #print('gyro_y =', self.gyro_y)
-        #print('gyro_z =', self.gyro_z)
-        #
-        #print('acc_x =', self.acc_x)
-        #print('acc_y =', self.acc_y)
-        #print('acc_z =', self.acc_z)
-
 
     def nearest_acc(self, t, acc):
         """
@@ -168,7 +157,6 @@ class SynImages(object):
             rotations.append(R)
 
         return rotations
-
 
     def compute_translations(self, rotations):
         """
@@ -243,7 +231,7 @@ class SynImages(object):
 
         return syn_H
 
-    def create_syn_images(self, img, isPlot=False):
+    def create_syn_images(self, img, file_prefix, isSave=True, isPlot=False):
         """
         # Generate a Synthetic Blurry Image
         :param img:  (H,W,3) ndarray size match with (self.image_H, self.image_W)
@@ -262,16 +250,65 @@ class SynImages(object):
 
         frames = np.array(frames)
         blur_img = np.mean(frames, axis=0)
-        gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
-        acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
+        self.gyro = np.stack([self.gyro_x, self.gyro_y, self.gyro_z], axis=0)
+        self.acc = np.stack([self.acc_x, self.acc_y, self.acc_z], axis=0)
 
-        error_blur_img, shift_blurry, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, gyro, acc)
+        error_blur_img, shift_blurry, error_gyro, error_acc, shift_time_stamp = self.add_error2data(img, syn_H, self.gyro, self.acc)
 
-        # plot result and then print data to a .txt file
+        if isSave:
+            self.save_data(img, blur_img, error_blur_img, file_prefix)
 
         if isPlot:
             self.plot_image_IMU(img, blur_img, shift_blurry, error_blur_img)
         return blur_img
+
+    def save_data(self, reference_img, original_blur, error_blur, file_prefix):
+        name_reference = "Dataset/Data_ref/" + file_prefix + ".png"
+        name_IMU_original = "Dataset/Data_ori/" + file_prefix + "_IMU_ori.txt"
+        name_blur_original = "Dataset/Data_ori/" + file_prefix + "_blur_ori.png"
+        name_IMU_error = "Dataset/Data_err/" + file_prefix + "_IMU_err.txt"
+        name_blur_error = "Dataset/Data_err/" + file_prefix + "_blur_err.png"
+        name_param_error = "Dataset/Data_err/" + file_prefix + "_param_err.txt"
+
+        # Output reference sharp image
+        cv2.imwrite(name_reference, reference_img)
+
+        # Original Perfect IMU data and corresponding blurry images.
+        f_original = open(name_IMU_original, "w+")
+        f_original.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z\r\n'")
+
+        for i in range(self.pose+1):
+            # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
+            f_original.write("%.18e %.18e %.18e %.18e %.18e %.18e %.18e \r\n" %
+                             (self.time_stamp[i],
+                             self.gyro_x[i], self.gyro_y[i], self.gyro_z[i],
+                             self.acc_x[i], self.acc_y[i], self.acc_z[i]))
+
+        f_original.close()
+        cv2.imwrite(name_blur_original, original_blur)
+
+        # Error IMU data and corresponding blurry images.
+        f_error = open(name_IMU_error, "w+")
+        f_error.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z\r\n'")
+
+        for i in range(self.total_samples):
+            # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
+            f_error.write("%.18e %.18e %.18e %.18e %.18e %.18e %.18e \r\n" %
+                             (self.delay_time_stamp[i],
+                              self.error_gyro[0][i], self.error_gyro[1][i], self.error_gyro[2][i],
+                              self.error_acc[0][i], self.error_acc[1][i], self.error_acc[2][i]))
+
+        f_error.close()
+        cv2.imwrite(name_blur_error, error_blur)
+
+        # Output Parameters of error data
+        f_error = open(name_param_error, "w+")
+
+        for k, v in self.paramDict.items():
+            # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
+            f_error.write("%s %f \r\n" % (k, v))
+
+        f_error.close()
 
     def add_error2data(self, img,  syn_H, gyro, acc):
         """
@@ -338,7 +375,6 @@ class SynImages(object):
         self.delay_time_stamp = shift_time_stamp
         self.paramDict["Time delay"] = time_delay
         return shift_gyro, shift_acc, shift_time_stamp
-
 
     def add_noise2IMU(self, gyro, acc):
         """
@@ -409,7 +445,7 @@ class SynImages(object):
 
         frames = np.array(frames)
         shift_blurry = np.mean(frames, axis=0)
-        print("rotation center = ", (rotation_o_x, rotation_o_y))
+        # print("rotation center = ", (rotation_o_x, rotation_o_y))
 
         self.paramDict["Rotation center o_x"] = rotation_o_x
         self.paramDict["Rotation center o_y"] = rotation_o_y
@@ -481,9 +517,8 @@ class SynImages(object):
         error_blur_img = shift_blurry + noise_img
 
         self.paramDict["Standard deviation of noise added to the blurry image"] = std_r
-        print("std of img_noise", std_r)
+        # print("std of img_noise", std_r)
         return error_blur_img
-
 
     def plot_image_IMU(self, img, blur_img, shift_blur, error_blur):
 
