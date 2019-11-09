@@ -27,7 +27,7 @@ class SynImages(object):
         self.exposure_low = 0.01
         self.exposure_high = 0.1
 
-        self.angular_v_mean = 0  # 5 if it's for rolling shutter test
+        self.angular_v_mean = 0.  # 5 if it's for rolling shutter test
         self.angular_v_std = 0.05
 
         self.acceleration_mean = 0.
@@ -58,7 +58,7 @@ class SynImages(object):
 
         # Parameter Dict for Error Effect
         self.paramDict = dict()
-        self.paramDict["Sampling frequence"] = self.sample_freq
+        self.paramDict["Sampling frequency"] = self.sample_freq
         self.paramDict["Number of poses"] = self.pose
         self.paramDict["Total samples of noisy IMU data"] = self.total_samples
         self.paramDict["Focal length"] = self.focal_length
@@ -86,7 +86,7 @@ class SynImages(object):
         self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_z = np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        # [self.angular_v_mean + 2 * self.angular_v_std] * self.samples
+        #self.gyro_z = [self.angular_v_mean] * self.samples # for test only
 
         self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
         self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
@@ -155,7 +155,6 @@ class SynImages(object):
             new_R = np.matmul(rotation_operator, R)
             R = new_R
             rotations.append(R)
-
         return rotations
 
     def compute_translations(self, rotations):
@@ -275,7 +274,7 @@ class SynImages(object):
 
         # Original Perfect IMU data and corresponding blurry images.
         f_original = open(name_IMU_original, "w+")
-        f_original.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z\r\n'")
+        f_original.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z \r\n")
 
         for i in range(self.pose+1):
             # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
@@ -289,7 +288,7 @@ class SynImages(object):
 
         # Error IMU data and corresponding blurry images.
         f_error = open(name_IMU_error, "w+")
-        f_error.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z\r\n'")
+        f_error.write("Timestamp Gyro_x Gyro_y Gyro_z Acc_x Acc_y Acc_z\r\n")
 
         for i in range(self.total_samples):
             # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
@@ -306,7 +305,7 @@ class SynImages(object):
 
         for k, v in self.paramDict.items():
             # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
-            f_error.write("%s %f \r\n" % (k, v))
+            f_error.write("%s: %f \r\n" % (k, v))
 
         f_error.close()
 
@@ -329,10 +328,14 @@ class SynImages(object):
         shift_blurry = self.add_rotation_center(img, syn_H)
 
         # # Add rolling shutter effect
-        rolling_blurry = self.add_rolling_shutter(shift_blurry)
+        rolling_blurry = self.add_rolling_shutter(img, shift_blurry)
 
         # Add noise to blurry image
         error_blur_img = self.add_noise2Blurry(rolling_blurry)
+
+        #cv2.imshow('Blurry_shift', shift_blurry / 255.0)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
 
         return error_blur_img, shift_blurry, shift_time_stamp, error_gyro, error_acc
 
@@ -423,8 +426,8 @@ class SynImages(object):
         :param syn_H: Array[self.pose][3x3] perfect synthetic homography
         :return: new blury image with shifted rotation center
         """
-        rotation_o_x = np.random.normal(loc=0, scale=self.image_W/4)
-        rotation_o_y = np.random.normal(loc=0, scale=self.image_W / 4)
+        rotation_o_x = np.random.normal(loc=0, scale=self.image_W / 4)
+        rotation_o_y = np.random.normal(loc=0, scale=self.image_H / 4)
 
         self.new_intrinsicMat = np.array([[self.focal_length/self.pixel_size, 0, self.image_W/2 + rotation_o_x],
                                      [0, self.focal_length/self.pixel_size, self.image_H/2 + rotation_o_y],
@@ -467,7 +470,7 @@ class SynImages(object):
         return rot_t.reshape((3, 3))
 
 
-    def add_rolling_shutter(self, img_blur):
+    def add_rolling_shutter(self, img, img_blur):
         """
         Add rolling shutter effect to blurry image
         :param img_blur:
@@ -484,6 +487,10 @@ class SynImages(object):
         R_last = self.rotations[-1]
         K_ = self.new_intrinsicMat
 
+        #W_last = np.matmul(np.matmul(K_, R_last), np.linalg.inv(K_))
+        #blur_ori = cv2.warpPerspective(img, W_last, (self.image_W, self.image_H),
+        #                               flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS, borderMode=cv2.BORDER_REPLICATE)
+        #img_blur = blur_ori
 
         new_pieces = []
         y = piece_H  # y-1 is the row index
@@ -492,7 +499,7 @@ class SynImages(object):
             # time and approximated rotation for y th row
             t_y = t_readout * y / self.image_H
             R_y = self.interp_rot(t_y)
-            R_new = np.matmul(R_last, np.linalg.inv(R_y))
+            R_new = np.matmul(R_y, np.linalg.inv(R_last))
             W_y = np.matmul(np.matmul(K_, R_new), np.linalg.inv(K_))
             old_piece = img_blur[y-piece_H:y, :, :]
             new_piece = cv2.warpPerspective(old_piece, W_y, (self.image_W, piece_H), flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS, borderMode=cv2.BORDER_REPLICATE)
@@ -500,6 +507,20 @@ class SynImages(object):
             y += piece_H
 
         img_blur_rs = np.concatenate(np.array(new_pieces), axis=0)
+        #crop_H = self.image_H / 2
+        #crop_W = self.image_W / 2
+        #
+        #crop_blur = img_blur[crop_H-300:crop_H+301, crop_W-300:crop_W+301, :]
+        #crop_blur_rs = img_blur_rs[crop_H-300:crop_H+301, crop_W-300:crop_W+301, :]
+        #
+        #
+        #cv2.imshow('Blurry_original', blur_ori / 255.0)
+        #cv2.imshow('Blurry_rolling', img_blur_rs / 255.0)
+        ##cv2.imshow('Blurry_ori_local', crop_blur / 255.0)
+        ##cv2.imshow('Blurry_rol_local', crop_blur_rs / 255.0)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
+        #exit()
 
         self.paramDict["Readout time"] = t_readout
         return img_blur_rs

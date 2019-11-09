@@ -54,10 +54,11 @@ for folder in splits:
             file_prefix = name_img[:-4]
             path_in = os.path.join(img_subset, name_img)
             img = cv2.imread(path_in, cv2.IMREAD_COLOR).astype(np.float)
+            H, W, _ = img.shape
+            SynData.image_H = H
+            SynData.image_W = W
             # img = ((img / 255) ** 2.2) * 255  # gamma correction, now is linear
             # img_blur = img_blur / 255 ** (1./ 2.2) * 255
             img_blur = SynData.create_syn_images(img, file_prefix, args.phase, isSave=True, isPlot=False)
-            print(path_in)
-            exit()
 
 
