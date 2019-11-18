@@ -86,7 +86,6 @@ class SynImages(object):
         self.gyro_x = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_y = 1e-5*np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
         self.gyro_z = np.random.normal(loc=self.angular_v_mean, scale=self.angular_v_std, size=(self.samples, ))
-        #self.gyro_z = [self.angular_v_mean] * self.samples # for test only
 
         self.acc_x = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
         self.acc_y = np.random.normal(loc=self.acceleration_mean, scale=self.acceleration_std, size=(self.samples, ))
@@ -221,13 +220,19 @@ class SynImages(object):
 
         K = self.intrinsicMat
         syn_H = []
+        syn_extrinsic = []
+        syn_extrinsic.append(np.array([[1,0,0],[0,1,0],[0,0,1]]))
         for i in range(1, self.pose+1):
             R = self.rotations[i]  # np.matmul(rotations[i], Ri3_0)
             T = np.matmul(self.translations[i], norm_v)
+            E = R + T
+            E = E / E[2][2]
             H = np.matmul(np.matmul(K, R+T), np.linalg.inv(K))
             H = H / H[2][2]
+            syn_extrinsic.append(E)
             syn_H.append(H)
 
+        self.syn_extrinsic = np.array(syn_extrinsic).reshape(self.pose+1, 9)
         return syn_H
 
     def create_syn_images(self, img, file_prefix, phase, isSave=True, isPlot=False):
@@ -262,12 +267,21 @@ class SynImages(object):
         return blur_img
 
     def save_data(self, reference_img, original_blur, error_blur, file_prefix, phase):
-        name_reference = "Dataset/" + phase + "/Data_ref/" + file_prefix + ".png"
-        name_IMU_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_IMU_ori.txt"
-        name_blur_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_blur_ori.png"
-        name_IMU_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_IMU_err.txt"
-        name_blur_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_blur_err.png"
-        name_param_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_param_err.txt"
+        if phase == "single":
+            name_folder = "Output"
+            name_reference = name_folder + file_prefix + ".png"
+            name_IMU_original = name_folder + file_prefix + "_IMU_ori.txt"
+            name_blur_original = name_folder + file_prefix + "_blur_ori.png"
+            name_IMU_error = name_folder + file_prefix + "_IMU_err.txt"
+            name_blur_error = name_folder + file_prefix + "_blur_err.png"
+            name_param_error = name_folder + file_prefix + "_param_err.txt"
+        else:
+            name_reference = "Dataset/" + phase + "/Data_ref/" + file_prefix + ".png"
+            name_IMU_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_IMU_ori.txt"
+            name_blur_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_blur_ori.png"
+            name_IMU_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_IMU_err.txt"
+            name_blur_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_blur_err.png"
+            name_param_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_param_err.txt"
 
         # Output reference sharp image
         cv2.imwrite(name_reference, reference_img)
@@ -332,10 +346,6 @@ class SynImages(object):
 
         # Add noise to blurry image
         error_blur_img = self.add_noise2Blurry(rolling_blurry)
-
-        #cv2.imshow('Blurry_shift', shift_blurry / 255.0)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
 
         return error_blur_img, shift_blurry, shift_time_stamp, error_gyro, error_acc
 
@@ -448,7 +458,6 @@ class SynImages(object):
 
         frames = np.array(frames)
         shift_blurry = np.mean(frames, axis=0)
-        # print("rotation center = ", (rotation_o_x, rotation_o_y))
 
         self.paramDict["Rotation center o_x"] = rotation_o_x
         self.paramDict["Rotation center o_y"] = rotation_o_y
@@ -460,12 +469,14 @@ class SynImages(object):
         :param acc: acc of a specific axis: Array([float])
         :return: nearest acc: Float
         """
+        h_array = self.syn_extrinsic
         if t >= self.time_stamp[-1]:
-            return self.rotations[-1]
+            H_last = h_array[-1, :]
+            return H_last.reshape((3,3))
 
         rot_t = np.array([0.]*9)
         for i in range(9):
-            rot_t[i] = np.interp(t, self.time_stamp, self.rotations_array[:, i])
+            rot_t[i] = np.interp(t, self.time_stamp, h_array[:, i])
 
         return rot_t.reshape((3, 3))
 
@@ -484,13 +495,9 @@ class SynImages(object):
         """
         t_readout = np.random.normal(loc=self.readout_mean, scale=self.readout_std)
         piece_H = int(self.image_H/self.total_sub)
-        R_last = self.rotations[-1]
+        H_last = self.syn_extrinsic[-1,:]
+        H_last = H_last.reshape((3,3))
         K_ = self.new_intrinsicMat
-
-        #W_last = np.matmul(np.matmul(K_, R_last), np.linalg.inv(K_))
-        #blur_ori = cv2.warpPerspective(img, W_last, (self.image_W, self.image_H),
-        #                               flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS, borderMode=cv2.BORDER_REPLICATE)
-        #img_blur = blur_ori
 
         new_pieces = []
         y = piece_H  # y-1 is the row index
@@ -498,29 +505,16 @@ class SynImages(object):
         while y <= self.image_H:
             # time and approximated rotation for y th row
             t_y = t_readout * y / self.image_H
-            R_y = self.interp_rot(t_y)
-            R_new = np.matmul(R_y, np.linalg.inv(R_last))
-            W_y = np.matmul(np.matmul(K_, R_new), np.linalg.inv(K_))
+            H_y = self.interp_rot(t_y)
+            H_new = np.matmul(H_y, np.linalg.inv(H_last))
+            W_y = np.matmul(np.matmul(K_, H_new), np.linalg.inv(K_))
+
             old_piece = img_blur[y-piece_H:y, :, :]
             new_piece = cv2.warpPerspective(old_piece, W_y, (self.image_W, piece_H), flags=cv2.INTER_LINEAR+cv2.WARP_FILL_OUTLIERS, borderMode=cv2.BORDER_REPLICATE)
             new_pieces.append(new_piece)
             y += piece_H
 
         img_blur_rs = np.concatenate(np.array(new_pieces), axis=0)
-        #crop_H = self.image_H / 2
-        #crop_W = self.image_W / 2
-        #
-        #crop_blur = img_blur[crop_H-300:crop_H+301, crop_W-300:crop_W+301, :]
-        #crop_blur_rs = img_blur_rs[crop_H-300:crop_H+301, crop_W-300:crop_W+301, :]
-        #
-        #
-        #cv2.imshow('Blurry_original', blur_ori / 255.0)
-        #cv2.imshow('Blurry_rolling', img_blur_rs / 255.0)
-        ##cv2.imshow('Blurry_ori_local', crop_blur / 255.0)
-        ##cv2.imshow('Blurry_rol_local', crop_blur_rs / 255.0)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
-        #exit()
 
         self.paramDict["Readout time"] = t_readout
         return img_blur_rs
@@ -538,7 +532,7 @@ class SynImages(object):
         error_blur_img = shift_blurry + noise_img
 
         self.paramDict["Standard deviation of noise added to the blurry image"] = std_r
-        # print("std of img_noise", std_r)
+
         return error_blur_img
 
     def plot_image_IMU(self, img, blur_img, shift_blur, error_blur):
