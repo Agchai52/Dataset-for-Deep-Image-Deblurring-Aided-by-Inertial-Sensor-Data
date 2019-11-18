@@ -13,18 +13,11 @@ args = parser.parse_args()
 
 # Input and Output Folders
 img_input_fold = './' + args.phase
-img_output_fold_ref = args.output_fold + args.phase + '/Data_ref'
-img_output_fold_ori = args.output_fold + args.phase + '/Data_ori'
-img_output_fold_err = args.output_fold + args.phase + '/Data_err'
+img_output_fold = args.output_fold + args.phase + '/'
 
-if not os.path.isdir(img_output_fold_ref):
-    os.makedirs(img_output_fold_ref)
 
-if not os.path.isdir(img_output_fold_ori):
-    os.makedirs(img_output_fold_ori)
-
-if not os.path.isdir(img_output_fold_err):
-    os.makedirs(img_output_fold_err)
+if not os.path.isdir(img_output_fold):
+    os.makedirs(img_output_fold)
 
 # Set jump of images
 N = 10

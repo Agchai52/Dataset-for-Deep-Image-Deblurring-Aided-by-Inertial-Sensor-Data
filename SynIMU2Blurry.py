@@ -268,21 +268,15 @@ class SynImages(object):
 
     def save_data(self, reference_img, original_blur, error_blur, file_prefix, phase):
         if phase == "single":
-            name_folder = "Output"
-            name_reference = name_folder + file_prefix + ".png"
-            name_IMU_original = name_folder + file_prefix + "_IMU_ori.txt"
-            name_blur_original = name_folder + file_prefix + "_blur_ori.png"
-            name_IMU_error = name_folder + file_prefix + "_IMU_err.txt"
-            name_blur_error = name_folder + file_prefix + "_blur_err.png"
-            name_param_error = name_folder + file_prefix + "_param_err.txt"
+            name_folder = "Output/"
         else:
-            name_reference = "Dataset/" + phase + "/Data_ref/" + file_prefix + ".png"
-            name_IMU_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_IMU_ori.txt"
-            name_blur_original = "Dataset/" + phase + "/Data_ori/" + file_prefix + "_blur_ori.png"
-            name_IMU_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_IMU_err.txt"
-            name_blur_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_blur_err.png"
-            name_param_error = "Dataset/" + phase + "/Data_err/" + file_prefix + "_param_err.txt"
-
+            name_folder = "Dataset/" + phase + "/"
+        name_reference = name_folder + file_prefix + "_ref.png"
+        name_IMU_original = name_folder+ file_prefix + "_IMU_ori.txt"
+        name_blur_original = name_folder + file_prefix + "_blur_ori.png"
+        name_IMU_error = name_folder + file_prefix + "_IMU_err.txt"
+        name_blur_error = name_folder + file_prefix + "_blur_err.png"
+        name_param_error = name_folder + file_prefix + "_param.txt"
         # Output reference sharp image
         cv2.imwrite(name_reference, reference_img)
 

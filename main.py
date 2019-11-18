@@ -13,9 +13,7 @@ file_prefix = "001464"
 phase = "single"
 if not os.path.exists('Dataset') and phase != "single":
     os.makedirs('Dataset')
-    os.makedirs('Dataset/train/Data_ref')
-    os.makedirs('Dataset/train/Data_ori')
-    os.makedirs('Dataset/train/Data_err')
+    os.makedirs('Dataset/train/')
 blur_img = SynData.create_syn_images(img, file_prefix, phase, isSave=True, isPlot=False)
 
 

@@ -14,7 +14,7 @@
 3. If you want to plot sensor data, just set `isPlot = True` in "main.py", otherwise `isPlot = False`.
 4. Run: `python main.py`.
 5. A single set of synthetic data will be saved in the folder "/Output".
-6. The output include a set of reference/original blurry/error blurry frames, original/error inertial sensor data and 
+6. The output includes a set of reference/original blurry/error blurry frames, original/error inertial sensor data and 
 all parameters.
 
 ## How to Generate Train/Test Dataset: 
@@ -28,3 +28,11 @@ all parameters.
     ```buildoutcfg
     python generateDatasetIMU.py --phase test
     ```
+ ## Output Dataset
+ In the phase folder, like "Dataset/train/"
+ - "ImageName_ref.png": the groundtruth sharp image
+ - "ImageName_blur_ori.png": the blurry image **without** error effects
+ - "ImageName_blur_err.png": the blurry image **with error** effects
+ - "ImageName_IMU_ori.txt": the gyro and acc data **with error** effects
+ - "ImageName_IMU_err.txt": the gyro and acc data **without error** effects
+ - "ImageName_param.txt": the parameters used in original data and error data
