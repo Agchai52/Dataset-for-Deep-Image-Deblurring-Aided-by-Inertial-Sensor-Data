@@ -33,6 +33,6 @@ all parameters.
  - "ImageName_ref.png": the groundtruth sharp image
  - "ImageName_blur_ori.png": the blurry image **without** error effects
  - "ImageName_blur_err.png": the blurry image **with error** effects
- - "ImageName_IMU_ori.txt": the gyro and acc data **with error** effects
- - "ImageName_IMU_err.txt": the gyro and acc data **without error** effects
+ - "ImageName_IMU_ori.txt": the gyro and acc data **without error** effects
+ - "ImageName_IMU_err.txt": the gyro and acc data **with error** effects
  - "ImageName_param.txt": the parameters used in original data and error data
