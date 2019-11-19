@@ -20,13 +20,13 @@ if not os.path.isdir(img_output_fold):
     os.makedirs(img_output_fold)
 
 # Set jump of images
-N = 10
+N = 5
 
 # folders in /test or /train
 splits = os.listdir(img_input_fold)
 
 counter = 0
-
+count_sets = 0
 SynData = SynImages()
 
 for folder in splits:
@@ -53,5 +53,7 @@ for folder in splits:
             # img = ((img / 255) ** 2.2) * 255  # gamma correction, now is linear
             # img_blur = img_blur / 255 ** (1./ 2.2) * 255
             img_blur = SynData.create_syn_images(img, file_prefix, args.phase, isSave=True, isPlot=False)
+            count_sets +=1
 
 print("Done!")
+print("The total number of sets = ", count_sets)
