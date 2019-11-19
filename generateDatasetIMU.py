@@ -54,4 +54,4 @@ for folder in splits:
             # img_blur = img_blur / 255 ** (1./ 2.2) * 255
             img_blur = SynData.create_syn_images(img, file_prefix, args.phase, isSave=True, isPlot=False)
 
-
+print("Done!")
