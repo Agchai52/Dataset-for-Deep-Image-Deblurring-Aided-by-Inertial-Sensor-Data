@@ -20,7 +20,7 @@ if not os.path.isdir(img_output_fold):
     os.makedirs(img_output_fold)
 
 # Set jump of images
-N = 5
+N = 10
 
 # folders in /test or /train
 splits = os.listdir(img_input_fold)
@@ -56,4 +56,5 @@ for folder in splits:
             count_sets += 1
 
 print("Done!")
-print("The total number of sets = ", count_sets)
+print("The total number of sets = ")
+print(count_sets)
