@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import matplotlib as mpl
+from backports import configparser
 mpl.use('TkAgg')
 from matplotlib import pyplot as plt
 
@@ -24,10 +25,10 @@ class SynImages(object):
         self.sample_freq = 200.
         self.pose = 30
 
-        self.exposure_low = 0.01
-        self.exposure_high = 0.1
+        self.exposure_low = 0.05
+        self.exposure_high = 0.2
 
-        self.angular_v_mean = 0.  # 5 if it's for rolling shutter test
+        self.angular_v_mean = 0.0  # 5 if it's for rolling shutter test
         self.angular_v_std = 0.05
 
         self.acceleration_mean = 0.
@@ -250,7 +251,7 @@ class SynImages(object):
             h_mat = syn_H[i]
             im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_W, self.image_H))
             frames.append(im_dst)
-            im_src = im_dst
+
 
         frames = np.array(frames)
         blur_img = np.mean(frames, axis=0)
@@ -277,6 +278,7 @@ class SynImages(object):
         name_IMU_error = name_folder + file_prefix + "_IMU_err.txt"
         name_blur_error = name_folder + file_prefix + "_blur_err.png"
         name_param_error = name_folder + file_prefix + "_param.txt"
+        name_param_config = name_folder + file_prefix + "_config.ini"
         # Output reference sharp image
         cv2.imwrite(name_reference, reference_img)
 
@@ -309,13 +311,19 @@ class SynImages(object):
         cv2.imwrite(name_blur_error, error_blur)
 
         # Output Parameters of error data
+        config = configparser.ConfigParser()
         f_error = open(name_param_error, "w+")
+        config['param'] = {}
 
         for k, v in self.paramDict.items():
             # Timestamp  gyro_x gyro_y gyro_z acc_x acc_y acc_z
             f_error.write("%s: %f \r\n" % (k, v))
+            config['param'][k] = str(v)
 
         f_error.close()
+
+        with open(name_param_config, 'w') as configfile:
+            config.write(configfile)
 
     def add_error2data(self, img,  syn_H, gyro, acc):
         """
@@ -592,18 +600,18 @@ class SynImages(object):
         ax1 = plt.subplot(311)
         ax1.plot(self.old_time_stamp, 100000*self.raw_gyro_x, 'or', markersize=2, label='raw_gyro_x')
         ax1.plot(self.time_stamp, 100000*self.gyro_x, '--r', label='gyro_x')
-        ax1.set_xlim(0., 0.08)
+        ax1.set_xlim(0., 0.5)
         plt.ylabel("wx * 1e-5")
         plt.title("XYZ-Axis Gyro Data (rad/s)")
 
         ax2 = plt.subplot(312)
-        ax2.set_xlim(0., 0.08)
+        ax2.set_xlim(0., 0.5)
         ax2.plot(self.old_time_stamp, 100000*self.raw_gyro_y, 'og', markersize=2, label='raw_gyro_y')
         ax2.plot(self.time_stamp, 100000*self.gyro_y, '--g', label='gyro_y')
         plt.ylabel("wy * 1e-5")
 
         ax3 = plt.subplot(313)
-        ax3.set_xlim(0., 0.08)
+        ax3.set_xlim(0., 0.5)
         ax3.plot(self.old_time_stamp, self.raw_gyro_z, 'ob', markersize=2, label='raw_gyro_z')
         ax3.plot(self.time_stamp, self.gyro_z, '--b', label='gyro_z')
         plt.ylabel("wz")
@@ -614,17 +622,17 @@ class SynImages(object):
         plt.figure()
         ax1 = plt.subplot(311)
         ax1.plot(self.delay_time_stamp, 100000 * self.error_gyro[0], ':r', label='error_gyro_x')
-        ax1.set_xlim(0., 0.08)
+        ax1.set_xlim(0., 0.5)
         plt.ylabel("wx * 1e-5")
         plt.title("XYZ-Axis Gyro Data (rad/s)")
 
         ax2 = plt.subplot(312)
-        ax2.set_xlim(0., 0.08)
+        ax2.set_xlim(0., 0.5)
         ax2.plot(self.delay_time_stamp, 100000 * self.error_gyro[1], ':g', label='error_gyro_y')
         plt.ylabel("wy * 1e-5")
 
         ax3 = plt.subplot(313)
-        ax3.set_xlim(0., 0.08)
+        ax3.set_xlim(0., 0.5)
         ax3.plot(self.delay_time_stamp, self.error_gyro[2], ':b', label='error_gyro_z')
         plt.ylabel("wz")
 
@@ -633,20 +641,20 @@ class SynImages(object):
 
         plt.figure()
         ax1 = plt.subplot(311)
-        ax1.set_xlim(0., 0.08)
+        ax1.set_xlim(0., 0.5)
         ax1.plot(self.old_time_stamp, 1000*self.raw_acc_x, 'or', markersize=2, label='raw_acc_x')
         ax1.plot(self.time_stamp, 1000*self.acc_x, '--r', label='acc_x')
         plt.ylabel("ax * 1e-3")
         plt.title("XYZ-Axis Acc Data (m^2/s)")
 
         ax2 = plt.subplot(312)
-        ax2.set_xlim(0., 0.08)
+        ax2.set_xlim(0., 0.5)
         ax2.plot(self.old_time_stamp, 1000*self.raw_acc_y, 'og', markersize=2, label='raw_acc_y')
         ax2.plot(self.time_stamp, 1000*self.acc_y, '--g', label='acc_y')
         plt.ylabel("ay * 1e-3")
 
         ax3 = plt.subplot(313)
-        ax3.set_xlim(0., 0.08)
+        ax3.set_xlim(0., 0.5)
         ax3.plot(self.old_time_stamp, 1000*self.raw_acc_z, 'ob', markersize=2, label='raw_acc_z')
         ax3.plot(self.time_stamp, 1000*self.acc_z, '--b', label='acc_z')
         plt.ylabel("az * 1e-3")
@@ -655,18 +663,18 @@ class SynImages(object):
 
         plt.figure()
         ax1 = plt.subplot(311)
-        ax1.set_xlim(0., 0.08)
+        ax1.set_xlim(0., 0.5)
         ax1.plot(self.delay_time_stamp, 1000 * self.error_acc[0], ':r', label='error_acc_x')
         plt.ylabel("ax * 1e-3")
         plt.title("XYZ-Axis Acc Data (m^2/s)")
 
         ax2 = plt.subplot(312)
-        ax2.set_xlim(0., 0.08)
+        ax2.set_xlim(0., 0.5)
         ax2.plot(self.delay_time_stamp, 1000 * self.error_acc[1], ':g', label='error_acc_y')
         plt.ylabel("ay * 1e-3")
 
         ax3 = plt.subplot(313)
-        ax3.set_xlim(0., 0.08)
+        ax3.set_xlim(0., 0.5)
         ax3.plot(self.delay_time_stamp, 1000 * self.error_acc[2], ':b', label='error_acc_z')
         plt.ylabel("az * 1e-3")
         plt.xlabel("Time / sec")

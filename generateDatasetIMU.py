@@ -23,28 +23,28 @@ if not os.path.isdir(img_output_fold):
 N = 10
 
 # folders in /test or /train
-splits = os.listdir(img_input_fold)
+splits = sorted(os.listdir(img_input_fold))
 
 counter = 0
 count_sets = 0
 SynData = SynImages()
 
 for folder in splits:
-    print(folder)
     if not folder.startswith('.'):  # and folder == 'GOPR0385_11_01':
+        print(folder)
         img_subset = os.path.join(img_input_fold, folder)
         print(img_subset)
         img_list = os.listdir(img_subset)
-        img_list = sorted(img_list, key=str.lower)
+        img_list = sorted(img_list)
         num_imgs = min(args.num_imgs, len(img_list))
-
-        out_num, extra_num = divmod(num_imgs, N)
+        out_num = num_imgs / N
         counter += 1
         prefix = '%02d' % counter
 
         for n in range(0, out_num):
             name_img = img_list[n*N]
-            file_prefix = name_img[:-4]
+            file_prefix = prefix + name_img[2:6]
+            print(file_prefix)
             path_in = os.path.join(img_subset, name_img)
             img = cv2.imread(path_in, cv2.IMREAD_COLOR).astype(np.float)
             H, W, _ = img.shape
