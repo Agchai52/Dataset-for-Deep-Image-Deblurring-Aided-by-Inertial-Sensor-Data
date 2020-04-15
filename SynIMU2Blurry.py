@@ -26,13 +26,13 @@ class SynImages(object):
         self.pose = 30
 
         self.exposure_low = 0.05
-        self.exposure_high = 0.2
+        self.exposure_high = 0.15
 
         self.angular_v_mean = 0.0  # 5 if it's for rolling shutter test
-        self.angular_v_std = 0.05
+        self.angular_v_std = 1.
 
         self.acceleration_mean = 0.
-        self.acceleration_std = 1e-4
+        self.acceleration_std = 2e-4
 
         self.focal_length = 50.
         self.pixel_size = 2.44 * 10 ** -6
@@ -249,9 +249,8 @@ class SynImages(object):
         im_src = img
         for i in range(self.pose):
             h_mat = syn_H[i]
-            im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_W, self.image_H))
+            im_dst = cv2.warpPerspective(img, h_mat, (self.image_W, self.image_H))
             frames.append(im_dst)
-
 
         frames = np.array(frames)
         blur_img = np.mean(frames, axis=0)
@@ -456,7 +455,6 @@ class SynImages(object):
             h_mat = h_mat / h_mat[2][2]
             im_dst = cv2.warpPerspective(im_src, h_mat, (self.image_W, self.image_H))
             frames.append(im_dst)
-            im_src = im_dst
 
         frames = np.array(frames)
         shift_blurry = np.mean(frames, axis=0)
