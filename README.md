@@ -24,14 +24,16 @@ all parameters.
 1. Put "generateDatasetIMU.py" and "SynIMU2Blurry.py" into "GOPRO_Large_all/". "GOPRO_Large_all" can be downloaded from 
 [this link](https://github.com/SeungjunNah/DeepDeblur_release) 
 2. Generate train datatset and save them in "Dataset/train", run:
-    ```buildoutcfg
+    ```
     python generateDatasetIMU.py --phase train
     nohup python generateDatasetIMU.py --phase train > logfile_dataset &
  
     ```
 3. Generate test datatset and save them in "Dataset/test", run:
-    ```buildoutcfg
+    ```
     python generateDatasetIMU.py --phase test
+    nohup python generateDatasetIMU.py --phase test > logfile_dataset_test &
+ 
     ```
  ## Output Dataset
  In the phase folder, like "Dataset/train/"
