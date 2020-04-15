@@ -26,7 +26,7 @@ all parameters.
 2. Generate train datatset and save them in "Dataset/train", run:
     ```buildoutcfg
     python generateDatasetIMU.py --phase train
-    nohup python generateDatasetIMU.py --phase test > logfile_dataset &
+    nohup python generateDatasetIMU.py --phase train > logfile_dataset &
  
     ```
 3. Generate test datatset and save them in "Dataset/test", run:
