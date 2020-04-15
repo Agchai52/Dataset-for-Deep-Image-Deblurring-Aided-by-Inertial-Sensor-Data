@@ -25,7 +25,7 @@ class SynImages(object):
         self.sample_freq = 200.
         self.pose = 30
 
-        self.exposure_low = 0.15
+        self.exposure_low = 0.05
         self.exposure_high = 0.15
 
         self.angular_v_mean = 0.0  # 5 if it's for rolling shutter test
