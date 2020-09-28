@@ -43,3 +43,14 @@ all parameters.
  - "ImageName_IMU_ori.txt": the gyro and acc data **without error** effects
  - "ImageName_IMU_err.txt": the gyro and acc data **with error** effects
  - "ImageName_param.txt": the parameters used in original data and error data
+ 
+ ## Citation
+ @article {deblurDatasetIMU:2020,
+title = "A Dataset for Deep Image Deblurring Aided by Inertial Sensor Data",
+journal = "Fast track article for IS\&T International Symposium on Electronic Imaging 2020: Computational Imaging XVIII proceedings.",
+year = "2020",
+itemtype = "ARTICLE",
+pages = {379-1--379-6(6)},
+doi = "doi:10.2352/ISSN.2470-1173.2019.13.COIMG-136",
+author = "Zhang, Shuang and Zhen, Ada and Stevenson, Robert L.",
+}
