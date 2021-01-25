@@ -1,7 +1,7 @@
 # Dataset for Deep Image Deblurring Aided by Inertial Sensor Data
 The inertial sensor aided scheme is one of the most well known branches of traditional image deblurring algorithms. Compared to other image deblurring schemes, however, this scheme is less successful in the deep learning field. It's partly because of lacking a proper dataset. To address this blank, in this paper, a synthetic training and testing dataset for inertial sensors aided deep image deblurring neural network is proposed. This dataset includes groundtruth and blurry image pairs as well as inertial sensor data recorded during the exposure time of each blurry image. To simulate the real situations, the proposed dataset also considers error effects, including misalignment, rotation center shift, rolling shutter effect as well as inertial sensor data noise and image noise. 
 
-The proposed dataset is called **DeblurIMUDataset** and is available at [this link.](https://drive.google.com/file/d/18_PcNpadgxPOSaSpsUcFiTHpxNDmMtO3/view?usp=sharing)
+The proposed dataset is called **DeblurIMU Dataset** and is available at [this link.](https://drive.google.com/file/d/18_PcNpadgxPOSaSpsUcFiTHpxNDmMtO3/view?usp=sharing) [[paper]](https://doi.org/10.2352/ISSN.2470-1173.2020.14.COIMG-379)
 
 ## Required Libraries
 - Python==2.7
@@ -46,11 +46,18 @@ all parameters.
  
  ## Citation
  @article {deblurDatasetIMU:2020,
+ 
 title = "A Dataset for Deep Image Deblurring Aided by Inertial Sensor Data",
+
 journal = "Fast track article for IS\&T International Symposium on Electronic Imaging 2020: Computational Imaging XVIII proceedings.",
+
 year = "2020",
+
 itemtype = "ARTICLE",
+
 pages = {379-1--379-6(6)},
-doi = "doi:10.2352/ISSN.2470-1173.2019.13.COIMG-136",
+
+doi = "doi:10.2352/ISSN.2470-1173.2020.14.COIMG-379",
+
 author = "Zhang, Shuang and Zhen, Ada and Stevenson, Robert L.",
 }
